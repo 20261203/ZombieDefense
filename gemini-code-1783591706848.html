@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>좀비 아포칼립스: 클래스룸 서바이벌</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #050505;
+            color: white;
+            font-family: 'Malgun Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameWrapper {
+            position: relative;
+            width: 1200px;
+            height: 800px;
+            max-height: 85vh; 
+            overflow: hidden;
+            border: 4px solid #333;
+            box-shadow: 0 0 40px rgba(0,0,0,0.95);
+            border-radius: 6px;
+            background-color: #111;
+            aspect-ratio: 1200 / 800;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: none;
+        }
+        
+        #bossHPContainer {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 700px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #ff2222;
+            border-radius: 4px;
+            padding: 6px;
+            display: none; 
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 34, 34, 0.6);
+            z-index: 10;
+        }
+        #bossHPBar {
+            width: 100%;
+            height: 22px;
+            background: linear-gradient(90deg, #b30000, #ff2222);
+            transition: width 0.05s linear;
+        }
+        #bossName {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffdddd;
+            margin-bottom: 4px;
+            letter-spacing: 2px;
+        }
+
+        #shopOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            display: none;
+        }
+        #shop-title-text {
+            font-size: 26px;
+            font-weight: bold;
+            color: #2ecc71;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+        }
+        #shop-sub-text {
+            font-size: 16px;
+            color: #ff9f43;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            width: 950px;
+            margin-bottom: 30px;
+        }
+        .shop-section {
+            background: rgba(25, 25, 25, 0.9);
+            padding: 18px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .shop-section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #ddd;
+            border-bottom: 1px solid #555;
+            padding-bottom: 6px;
+        }
+        .button-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .shop-btn {
+            padding: 11px;
+            background: #1f1f1f;
+            color: #eee;
+            border: 1px solid #444;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .shop-btn:hover:not(:disabled) { background: #2a2a2a; border-color: #2ecc71; color: #fff; }
+        .shop-btn:disabled { background: #111; color: #444; border-color: #222; cursor: not-allowed; }
+        
+        #start-wave-btn {
+            padding: 15px 50px;
+            background: #2ecc71;
+            color: white;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(46, 204, 113, 0.4);
+            transition: all 0.2s;
+        }
+        #start-wave-btn:hover {
+            background: #27ae60;
+            box-shadow: 0 0 25px rgba(46, 204, 113, 0.7);
+        }
+
+        #controls-desc { margin-top: 10px; font-size: 13px; color: #aaa; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="gameWrapper">
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+    
+    <div id="bossHPContainer">
+        <div id="bossName">BOSS NAME</div>
+        <div style="background: #111; border: 1px solid #444; border-radius: 2px; overflow: hidden; padding: 1px;">
+            <div id="bossHPBar"></div>
+        </div>
+    </div>
+
+    <div id="shopOverlay">
+        <div id="shop-title-text">구역 정화 완료</div>
+        <div id="shop-sub-text">"정비하여 다음 웨이브를 대기하세요"</div>
+        
+        <div class="shop-grid">
+            <div class="shop-section">
+                <div class="shop-section-title">무기 격전 상점</div>
+                <div class="button-grid">
+                    <button class="shop-btn" id="buy-w1" onclick="buyWeapon(1)">🪓 소드오프 (330코인) [권총 탈출용/좁은범위]</button>
+                    <button class="shop-btn" id="buy-w2" onclick="buyWeapon(2)">⚡ MP5 SMG (650코인) [고속연사/단일타겟]</button>
+                    <button class="shop-btn" id="buy-w3" onclick="buyWeapon(3)">🔫 AK-47 (800코인) [고데미지 연사]</button>
+                    <button class="shop-btn" id="buy-w4" onclick="buyWeapon(4)">🔥 M249 (1800코인) [최강 기관총]</button>
+                    <button class="shop-btn" id="buy-w5" onclick="buyWeapon(5)">💥 Remington 샷건 (2200코인) [★상향★ 결전 폭발 화력]</button>
+                </div>
+            </div>
+            <div class="shop-section">
+                <div class="shop-section-title">생존 통제실 및 자동 터렛</div>
+                <div class="button-grid">
+                    <button class="shop-btn" id="buy-barricade" onclick="buyBarricade()">🚧 바리케이트 보강 (+100) (100코인)</button>
+                    <button class="shop-btn" id="buy-grenade" onclick="buyGrenade()">💣 대좀비 수류탄 (+1) (100코인)</button>
+                    <button class="shop-btn" id="buy-molotov" onclick="buyMolotov()">🔥 소형 화염병 (+1) (250코인)</button>
+                    <button class="shop-btn" id="buy-trap" onclick="buyTrap()">🕸️ 보스 전용 구속 덫 (+1) (400코인)</button>
+                    <button class="shop-btn" id="buy-t-gloc" onclick="buyTurret('gloc')">🤖 Gloc-19 자동 터렛 (800코인) [★1.2초당 1발]</button>
+                    <button class="shop-btn" id="buy-t-ak" onclick="buyTurret('ak')">⚙️ AK-47 자동 터렛 (2000코인) [★초당 2.5발 고속]</button>
+                    <button class="shop-btn" id="buy-t-grenade" onclick="buyTurret('grenade')">🎯 수류탄 중포 터렛 (2500코인) [★9.5초당 광역 수류탄]</button>
+                    <button class="shop-btn" id="buy-t-molotov" onclick="buyTurret('molotov')">🌋 화염병 투사 터렛 (3000코인) [★11.5초당 화염 장판]</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="start-wave-btn" onclick="startWave()">방어선 가동 (WAVE 시작)</button>
+    </div>
+</div>
+
+<div id="controls-desc">
+    [조작] 마우스: 조준경 | 클릭/홀드: 사격 | [1~6] 키: 무기 교체 | [G]: 수류탄 | [F]: 화염병 | [T]: 보스 덫
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const shopOverlay = document.getElementById("shopOverlay");
+
+const waveTitles = {
+    1: "라쿤시티 진입로 (안전지대)",
+    2: "폐허가 된 주유소",
+    3: "파괴된 도시 대로 (⚠️위험구역)",
+    4: "감염된 아파트 단지",
+    5: "침묵의 지하철역 (💀강화 및 듀얼 보스)",
+    6: "엄브렐러 연구소 외곽 (💀강화 및 듀얼 보스)",
+    7: "최종 격리 구역 통제선 (💀강화 및 듀얼 보스)",
+    8: "멸망의 격전지 (💀최종 강화 듀얼 보스)"
+};
+
+const imgSources = {
+    bg1: "Screenshot 2026-07-08 4.19.15 PM.png",
+    bg2: "Screenshot 2026-07-08 4.19.22 PM.png",
+    bg3: "Screenshot 2026-07-08 4.19.31 PM.png",
+    bg4: "Screenshot 2026-07-08 4.19.36 PM.png",
+    bg5: "Screenshot 2026-07-08 4.19.43 PM.png",
+    bg6: "Screenshot 2026-07-08 4.19.51 PM.png",
+    bg7: "Screenshot 2026-07-08 4.19.57 PM.png",
+    bg8: "Screenshot 2026-07-08 4.20.03 PM.png",
+    zombie: "Screenshot 2026-07-08 3.58.36 PM.png",
+    zombie_hard: "Screenshot 2026-07-08 3.58.58 PM.png",
+    zombie_super: "Screenshot 2026-07-08 3.59.06 PM.png",
+    boss_necro: "Screenshot 2026-07-08 3.59.17 PM.png",
+    boss_titan: "Screenshot 2026-07-08 3.59.25 PM.png",
+    boss_doomsday: "Screenshot 2026-07-08 3.59.37 PM.png",
+    boss_revenant: "Screenshot 2026-07-08 3.59.17 PM.png"
+};
+
+const images = {};
+let loadedImages = 0;
+const totalImages = Object.keys(imgSources).length;
+
+for (let key in imgSources) {
+    images[key] = new Image();
+    images[key].src = imgSources[key];
+    images[key].onload = () => { loadedImages++; };
+}
+
+let hp = 100;
+let maxHp = 100;
+let barricade = 0;
+let maxBarricade = 200;
+let coins = 0;
+let gameOver = false;
+let gameWon = false;
+
+let currentWave = 1;
+const maxWaves = 8;
+let waveState = "PLAYING"; 
+let enemiesToSpawn = 12; 
+let spawnCooldown = 48;
+let bossSpawned = false;
+let secondBossSpawned = false; 
+let activeBoss = null; 
+
+let grenades = 0;
+let molotovs = 0; 
+let traps = 0; 
+let flashAlpha = 0;
+let shakeIntensity = 0;
+
+// 🤖 자동 터렛 보유 상태 및 쿨타임 변수
+let ownedTurrets = { gloc: false, ak: false, grenade: false, molotov: false };
+let turretCooldowns = { gloc: 0, ak: 0, grenade: 0, molotov: 0 };
+let turretEffects = []; 
+
+let isMouseDown = false;
+let shootCooldown = 0;
+
+const weapons = [
+    { name: "Gloc19", damage: 15, cost: 0, type: "single", cooldown: 6, radius: 18 },
+    { name: "소드오프", damage: 24, cost: 330, type: "single", cooldown: 20, radius: 32 }, 
+    { name: "MP5", damage: 22, cost: 650, type: "auto", cooldown: 6, radius: 19 },       
+    { name: "AK-47", damage: 44, cost: 800, type: "auto", cooldown: 8, radius: 20 },          
+    { name: "M249", damage: 62, cost: 1800, type: "auto", cooldown: 4, radius: 22 },         
+    // 💥 레밍턴 샷건 수치 버프 상향 완료 (데미지 60 -> 85, 반경 56 -> 62)
+    { name: "Remington (샷건)", damage: 85, cost: 2200, type: "single", cooldown: 25, radius: 62 } 
+];
+let currentWeaponIndex = 0;
+let ownedWeapons = [true, false, false, false, false, false];
+
+const enemyTypes = [
+    { name: "좀비", hp: 45, coin: 12, baseSize: 64, speed: 0.0012, isBoss: false, imgKey: "zombie" },
+    { name: "강화 좀비", hp: 80, coin: 24, baseSize: 72, speed: 0.0014, isBoss: false, imgKey: "zombie_hard" },
+    { name: "슈퍼 좀비", hp: 145, coin: 48, baseSize: 82, speed: 0.0016, isBoss: false, imgKey: "zombie_super" },
+    { name: "네크로 워커", hp: 2100, coin: 150, baseSize: 145, speed: 0.00045, isBoss: true, imgKey: "boss_necro" },
+    { name: "타이탄 뮤턴트", hp: 4000, coin: 300, baseSize: 170, speed: 0.00042, isBoss: true, imgKey: "boss_titan" },
+    { name: "둠스데이 레이스", hp: 8000, coin: 600, baseSize: 200, speed: 0.00040, isBoss: true, imgKey: "boss_doomsday" },
+    { name: "레버넌트 오버로드", hp: 20000, coin: 1200, baseSize: 250, speed: 0.00035, isBoss: true, imgKey: "boss_revenant" }
+];
+
+const waveConfigs = {
+    1: { normalPool: [0], bossIndex: 3, totalNormals: 12, spawnRate: 48 },    
+    2: { normalPool: [0, 1], bossIndex: 4, totalNormals: 25, spawnRate: 28 }, 
+    3: { normalPool: [0, 1, 2], bossIndex: 5, totalNormals: 60, spawnRate: 16 }, 
+    4: { normalPool: [1, 2], bossIndex: 6, totalNormals: 75, spawnRate: 15 }, 
+    5: { normalPool: [1, 2], bossIndex: 4, totalNormals: 90, spawnRate: 14 }, 
+    6: { normalPool: [2], bossIndex: 5, totalNormals: 105, spawnRate: 12 }, 
+    7: { normalPool: [2], bossIndex: 6, totalNormals: 115, spawnRate: 11 }, 
+    8: { normalPool: [0, 1, 2], bossIndex: 6, totalNormals: 140, spawnRate: 9 } 
+};
+
+let enemies = [];
+let particles = [];
+let fires = []; 
+let mouseX = canvas.width / 2;
+let mouseY = canvas.height / 2;
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * scaleX;
+    mouseY = (e.clientY - rect.top) * scaleY;
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    if (gameOver || gameWon || waveState !== "PLAYING") return;
+    isMouseDown = true;
+    if (weapons[currentWeaponIndex].type === "single") {
+        fireWeapon();
+    }
+});
+
+window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+function fireWeapon() {
+    if (shootCooldown > 0 || waveState !== "PLAYING") return;
+    
+    const wp = weapons[currentWeaponIndex];
+    shootCooldown = wp.cooldown;
+    flashAlpha = 0.2;
+
+    enemies.sort((a, b) => b.progress - a.progress);
+    let hitsCount = 0;
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        let dist = Math.hypot(enemy.x - mouseX, enemy.y - mouseY);
+        
+        if (wp.name.includes("샷건") || wp.name.includes("소드오프")) {
+            if (dist < enemy.currentSize + wp.radius) {
+                processHit(enemy, wp.damage, i);
+                hitsCount++;
+            }
+        } else {
+            if (dist < enemy.currentSize + 15) {
+                processHit(enemy, wp.damage, i);
+                hitsCount++;
+                break; 
+            }
+        }
+    }
+
+    if (hitsCount === 0) {
+        createExplosion(mouseX, mouseY, "rgba(255,255,255,0.15)", 2, 1);
+    }
+}
+
+function processHit(enemy, damage, index) {
+    enemy.hp -= damage;
+    createExplosion(enemy.x, enemy.y, enemy.color, 4, 3);
+    
+    if (enemy.hp <= 0) {
+        // 🐛 버그 전면 해결 핵심: 첫 보스가 일찍 소멸했을 때 아직 2번 보스가 안 나왔다면 즉시 구동 트리거
+        if (enemy.isBossElement && !enemy.isSecondBoss && currentWave >= 5 && !secondBossSpawned) {
+            triggerSecondBossSpawn();
+        }
+
+        coins += enemy.coin;
+        createExplosion(enemy.x, enemy.y, "#ffffff", 12, 5);
+        
+        if(activeBoss === enemy) {
+            activeBoss = null;
+            const remainingBoss = enemies.find(e => e.isBossElement && e.hp > 0);
+            if (remainingBoss) activeBoss = remainingBoss;
+            else document.getElementById("bossHPContainer").style.display = "none";
+        }
+        enemies.splice(index, 1);
+    }
+}
+
+window.addEventListener('keydown', (e) => {
+    if (gameOver || gameWon) return;
+    const key = e.key.toLowerCase();
+    
+    if ((key === 'g' || e.key === 'ㅎ') && waveState === "PLAYING") useGrenade();
+    if ((key === 'f' || e.key === 'ㄹ') && waveState === "PLAYING") useMolotov();
+    if ((key === 't' || e.key === 'ㅅ') && waveState === "PLAYING") useTrap();
+    
+    if (e.key === '1' && ownedWeapons[0]) currentWeaponIndex = 0;
+    if (e.key === '2' && ownedWeapons[1]) currentWeaponIndex = 1;
+    if (e.key === '3' && ownedWeapons[2]) currentWeaponIndex = 2;
+    if (e.key === '4' && ownedWeapons[3]) currentWeaponIndex = 3;
+    if (e.key === '5' && ownedWeapons[4]) currentWeaponIndex = 4;
+    if (e.key === '6' && ownedWeapons[5]) currentWeaponIndex = 5;
+});
+
+function createExplosion(x, y, color, count, maxRadius) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 6,
+            vy: (Math.random() - 0.5) * 6,
+            radius: Math.random() * maxRadius + 1,
+            color: color || "#fff",
+            alpha: 1,
+            decay: Math.random() * 0.04 + 0.02
+        });
+    }
+}
+
+function buyWeapon(index) {
+    if (waveState === "PLAYING") return;
+    if (coins >= weapons[index].cost && !ownedWeapons[index]) {
+        coins -= weapons[index].cost;
+        ownedWeapons[index] = true;
+        currentWeaponIndex = index;
+        updateShopUI();
+    }
+}
+function buyBarricade() {
+    if (waveState === "PLAYING") return;
+    if (coins >= 100) {
+        coins -= 100;
+        barricade = Math.min(barricade + 100, maxBarricade);
+        updateShopUI();
+    }
+}
+function buyGrenade() {
+    if (waveState === "PLAYING") return;
+    if (coins >= 100) { coins -= 100; grenades++; updateShopUI(); }
+}
+function buyMolotov() {
+    if (waveState === "PLAYING") return;
+    if (coins >= 250) { coins -= 250; molotovs++; updateShopUI(); }
+}
+function buyTrap() {
+    if (waveState === "PLAYING") return;
+    if (coins >= 400) { coins -= 400; traps++; updateShopUI(); }
+}
+
+function buyTurret(type) {
+    if (waveState === "PLAYING") return;
+    const costs = { gloc: 800, ak: 2000, grenade: 2500, molotov: 3000 };
+    if (coins >= costs[type] && !ownedTurrets[type]) {
+        coins -= costs[type];
+        ownedTurrets[type] = true;
+        updateShopUI();
+    }
+}
+
+function useTrap() {
+    if (traps > 0) {
+        let applied = false;
+        enemies.forEach(enemy => {
+            if (enemy.isBossElement) {
+                enemy.stunTimer = 120; 
+                createExplosion(enemy.x, enemy.y, "#48dbfb", 25, 6);
+                applied = true;
+            }
+        });
+        if (applied) traps--;
+    }
+}
+
+function useMolotov() {
+    if (molotovs > 0) {
+        molotovs--;
+        spawnMolotovZone(mouseX, mouseY);
+    }
+}
+
+function spawnMolotovZone(tx, ty) {
+    fires.push({
+        x: tx,
+        y: ty,
+        radius: 130,
+        duration: 300, 
+        damageTimer: 0
+    });
+    createExplosion(tx, ty, "#ff7675", 30, 6);
+}
+
+function startWave() {
+    shopOverlay.style.display = "none"; 
+    currentWave++; 
+    waveState = "PLAYING";
+    enemiesToSpawn = waveConfigs[currentWave].totalNormals;
+    spawnCooldown = 0;
+    bossSpawned = false;
+    secondBossSpawned = false;
+    activeBoss = null;
+    document.getElementById("bossHPContainer").style.display = "none";
+}
+
+function updateShopUI() {
+    document.getElementById("shop-title-text").textContent = `WAVE ${currentWave} 클리어`;
+    
+    for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById(`buy-w${i}`);
+        if (ownedWeapons[i]) { btn.textContent = `${weapons[i].name} (보유)`; btn.disabled = true; }
+        else btn.disabled = coins < weapons[i].cost;
+    }
+    document.getElementById("buy-barricade").disabled = (coins < 100 || barricade >= maxBarricade);
+    document.getElementById("buy-grenade").disabled = (coins < 100);
+    document.getElementById("buy-molotov").disabled = (coins < 250);
+    document.getElementById("buy-trap").disabled = (coins < 400);
+
+    const tTypes = ['gloc', 'ak', 'grenade', 'molotov'];
+    const tCosts = { gloc: 800, ak: 2000, grenade: 2500, molotov: 3000 };
+    const tNames = { gloc: "Gloc-19 터렛", ak: "AK-47 터렛", grenade: "수류탄 터렛", molotov: "화염병 터렛" };
+    
+    tTypes.forEach(t => {
+        const btn = document.getElementById(`buy-t-${t}`);
+        if (ownedTurrets[t]) { btn.textContent = `${tNames[t]} (배치 완료)`; btn.disabled = true; }
+        else btn.disabled = coins < tCosts[t];
+    });
+}
+
+function triggerSecondBossSpawn() {
+    const config = waveConfigs[currentWave];
+    const secondBoss = spawnEnemy(config.bossIndex, true, true); 
+    secondBossSpawned = true;
+    activeBoss = secondBoss;
+    document.getElementById("bossName").textContent = `⚠️ WARNING: ${secondBoss.name} ⚠️`;
+    document.getElementById("bossHPContainer").style.display = "block";
+    createExplosion(canvas.width / 2, canvas.height / 2, "rgba(255,10,10,0.4)", 30, 8);
+}
+
+function handleSpawning() {
+    if (waveState !== "PLAYING") return;
+    
+    const config = waveConfigs[currentWave];
+    
+    if (enemiesToSpawn > 0) {
+        spawnCooldown--;
+        if (spawnCooldown <= 0) {
+            spawnCooldown = config.spawnRate;
+            const poolIndex = config.normalPool[Math.floor(Math.random() * config.normalPool.length)];
+            spawnEnemy(poolIndex, false);
+            enemiesToSpawn--;
+        }
+    } 
+    else if (!bossSpawned && enemies.length === 0) {
+        const bossObj = spawnEnemy(config.bossIndex, true, false); 
+        activeBoss = bossObj;
+        bossSpawned = true;
+        
+        document.getElementById("bossName").textContent = `⚠️ WARNING: ${bossObj.name} ⚠️`;
+        document.getElementById("bossHPContainer").style.display = "block";
+    }
+    // 기본 거리 충족 시 두 번째 보스 조기 소환 체크
+    else if (bossSpawned && currentWave >= 5 && !secondBossSpawned) {
+        const firstBoss = enemies.find(e => e.isBossElement && !e.isSecondBoss);
+        if (firstBoss && firstBoss.progress >= 0.45) {
+            triggerSecondBossSpawn();
+        }
+    }
+    else if (bossSpawned && enemies.length === 0) {
+        if (currentWave < maxWaves) {
+            waveState = "CLEAR";
+            document.getElementById("bossHPContainer").style.display = "none";
+            updateShopUI();
+            shopOverlay.style.display = "flex"; 
+        } else {
+            gameWon = true;
+        }
+    }
+}
+
+function spawnEnemy(typeIndex, isBossVariant, isSecondBoss = false) {
+    const type = enemyTypes[typeIndex];
+    const angle = Math.PI * 0.15 + Math.random() * Math.PI * 0.7; 
+    
+    let baseHp = type.hp;
+    let rewardCoin = type.coin;
+
+    if (currentWave >= 5) {
+        baseHp = isBossVariant ? Math.floor(type.hp * 1.6) : Math.floor(type.hp * 2.0);
+        rewardCoin = Math.floor(type.coin * 1.8);
+    } else {
+        if (currentWave === 1 && !isBossVariant) rewardCoin = 26;
+    }
+    if (isSecondBoss) rewardCoin = 0; 
+
+    const enemyObj = {
+        name: isSecondBoss ? `${type.name} (환영)` : type.name,
+        maxHp: baseHp, 
+        hp: baseHp,
+        coin: rewardCoin,
+        baseSize: type.baseSize,
+        color: type.color,
+        speed: type.speed,
+        progress: 0.05, 
+        baseAngle: angle, 
+        x: canvas.width / 2,
+        y: canvas.height / 2, 
+        currentSize: 2,
+        isBossElement: isBossVariant,
+        isSecondBoss: isSecondBoss,
+        imgKey: type.imgKey,
+        
+        animTimer: 0,
+        shakeTriggered: false,
+        summonTimer: 120,
+        stunTimer: 0, 
+
+        waveFreq: (Math.random() * 12 + 6),  
+        waveAmp: isBossVariant ? (Math.random() * 0.12 + 0.06) : (Math.random() * 0.55 + 0.35) 
+    };
+    
+    enemies.push(enemyObj);
+    return enemyObj;
+}
+
+function useGrenade() {
+    if (grenades > 0) {
+        grenades--;
+        triggerGrenadeExplosion(mouseX, mouseY);
+    }
+}
+
+function triggerGrenadeExplosion(tx, ty) {
+    createExplosion(tx, ty, "#ff6b6b", 40, 8);
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        let dist = Math.hypot(enemy.x - tx, enemy.y - ty);
+        if (dist <= 180 + enemy.currentSize) {
+            processHit(enemy, 220, i);
+        }
+    }
+}
+
+// 🤖 자동 터렛 연산 처리 모듈 (상향 조정 사양 반영)
+function handleTurrets() {
+    if (waveState !== "PLAYING") return;
+
+    // 1. Gloc-19 터렛 (★상향★ 1.2초당 1발 = 72프레임 쿨다운)
+    if (ownedTurrets.gloc) {
+        turretCooldowns.gloc--;
+        if (turretCooldowns.gloc <= 0 && enemies.length > 0) {
+            let target = getClosestEnemy();
+            if (target) {
+                target.hp -= 15; 
+                turretEffects.push({ sx: 200, sy: canvas.height - 30, tx: target.x, ty: target.y, alpha: 10 });
+                createExplosion(target.x, target.y, target.color, 2, 2);
+                if (target.hp <= 0) checkEnemyDeath(target);
+                turretCooldowns.gloc = 72;
+            }
+        }
+    }
+
+    // 2. AK-47 터렛 (★상향★ 초당 2.5발 = 24프레임 쿨다운)
+    if (ownedTurrets.ak) {
+        turretCooldowns.ak--;
+        if (turretCooldowns.ak <= 0 && enemies.length > 0) {
+            let target = getClosestEnemy();
+            if (target) {
+                target.hp -= 25;
+                turretEffects.push({ sx: 1000, sy: canvas.height - 30, tx: target.x, ty: target.y, alpha: 10 });
+                createExplosion(target.x, target.y, "#ff9f43", 3, 2);
+                if (target.hp <= 0) checkEnemyDeath(target);
+                turretCooldowns.ak = 24;
+            }
+        }
+    }
+
+    // 3. 수류탄 터렛 (★상향★ 9.5초당 1발 = 570프레임 쿨다운)
+    if (ownedTurrets.grenade) {
+        turretCooldowns.grenade--;
+        if (turretCooldowns.grenade <= 0) {
+            let tx = canvas.width / 2 + (Math.random() - 0.5) * 200;
+            let ty = canvas.height * 0.65 + (Math.random() - 0.5) * 100;
+            triggerGrenadeExplosion(tx, ty);
+            turretEffects.push({ sx: 350, sy: canvas.height - 30, tx: tx, ty: ty, alpha: 25, type: 'shell' });
+            turretCooldowns.grenade = 570;
+        }
+    }
+
+    // 4. 화염병 터렛 (★상향★ 11.5초당 1발 = 690프레임 쿨다운)
+    if (ownedTurrets.molotov) {
+        turretCooldowns.molotov--;
+        if (turretCooldowns.molotov <= 0) {
+            let tx = canvas.width / 2 + (Math.random() - 0.5) * 300;
+            let ty = canvas.height * 0.55 + (Math.random() - 0.5) * 80;
+            spawnMolotovZone(tx, ty);
+            turretEffects.push({ sx: 850, sy: canvas.height - 30, tx: tx, ty: ty, alpha: 25, type: 'fire' });
+            turretCooldowns.molotov = 690;
+        }
+    }
+}
+
+function getClosestEnemy() {
+    let closest = null;
+    let maxProgress = -1;
+    enemies.forEach(e => {
+        if (e.progress > maxProgress && e.hp > 0) {
+            maxProgress = e.progress;
+            closest = e;
+        }
+    });
+    return closest;
+}
+
+function checkEnemyDeath(enemy) {
+    if (enemy.hp <= 0) {
+        let idx = enemies.indexOf(enemy);
+        if (idx !== -1) {
+            // 첫번째 보스 조기 소탕 시 두번째 보스 강제 소환 보강
+            if (enemy.isBossElement && !enemy.isSecondBoss && currentWave >= 5 && !secondBossSpawned) {
+                triggerSecondBossSpawn();
+            }
+
+            coins += enemy.coin;
+            createExplosion(enemy.x, enemy.y, "#ffffff", 12, 5);
+            if(activeBoss === enemy) {
+                activeBoss = null;
+                const remainingBoss = enemies.find(e => e.isBossElement && e.hp > 0);
+                if (remainingBoss) activeBoss = remainingBoss;
+                else document.getElementById("bossHPContainer").style.display = "none";
+            }
+            enemies.splice(idx, 1);
+        }
+    }
+}
+
+function handleMolotovs() {
+    for (let i = fires.length - 1; i >= 0; i--) {
+        let f = fires[i];
+        f.duration--;
+        
+        if (Math.random() < 0.4) {
+            particles.push({
+                x: f.x + (Math.random() - 0.5) * f.radius * 1.2,
+                y: f.y + (Math.random() - 0.5) * f.radius * 1.2,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: -Math.random() * 2.5 - 0.5,
+                radius: Math.random() * 4 + 2,
+                color: Math.random() < 0.6 ? "#ff9f43" : "#ee5253",
+                alpha: 1,
+                decay: 0.03
+            });
+        }
+
+        f.damageTimer--;
+        if (f.damageTimer <= 0) {
+            f.damageTimer = 9; 
+            for (let eIdx = enemies.length - 1; eIdx >= 0; eIdx--) {
+                let enemy = enemies[eIdx];
+                let dist = Math.hypot(enemy.x - f.x, enemy.y - f.y);
+                if (dist <= f.radius + enemy.currentSize) {
+                    processHit(enemy, 6, eIdx); 
+                }
+            }
+        }
+        if (f.duration <= 0) fires.splice(i, 1);
+    }
+}
+
+function drawHUD() {
+    ctx.save();
+    ctx.fillStyle = "rgba(10, 10, 10, 0.75)";
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(20, 20, 340, 115, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.textAlign = "left";
+    ctx.font = "bold 13px sans-serif";
+    
+    ctx.fillStyle = "#ff5252";
+    ctx.fillText(`❤️ 거점 체력: ${hp} / ${maxHp}`, 35, 48);
+    ctx.fillStyle = "#ff9f43";
+    ctx.fillText(`🚧 바리케이트: ${barricade} / ${maxBarricade}`, 35, 73);
+    ctx.fillStyle = "#feca57";
+    ctx.fillText(`💰 보유 코인: ${coins} COIN`, 35, 98);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`🔫 무장: ${weapons[currentWeaponIndex].name} (💣${grenades} 🔥${molotovs} 🕸️${traps})`, 35, 120);
+
+    ctx.beginPath();
+    ctx.roundRect(canvas.width - 320, 20, 300, 70, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#48dbfb";
+    ctx.font = "bold 15px sans-serif";
+    ctx.fillText(`🌊 WAVE ${currentWave} / ${maxWaves}`, canvas.width - 35, 45);
+    ctx.fillStyle = "#ff9f43";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(waveTitles[currentWave], canvas.width - 35, 70);
+    ctx.restore();
+}
+
+function renderTurretsOnField() {
+    if (ownedTurrets.gloc) {
+        ctx.fillStyle = "#54a0ff"; ctx.fillRect(180, canvas.height - 35, 40, 35);
+        ctx.fillStyle = "#fff"; ctx.font = "10px sans-serif"; ctx.fillText("GLOC-T", 182, canvas.height - 40);
+    }
+    if (ownedTurrets.grenade) {
+        ctx.fillStyle = "#ff6b6b"; ctx.fillRect(330, canvas.height - 45, 45, 45);
+        ctx.fillStyle = "#fff"; ctx.font = "10px sans-serif"; ctx.fillText("GREN-T", 332, canvas.height - 50);
+    }
+    if (ownedTurrets.molotov) {
+        ctx.fillStyle = "#ff9f43"; ctx.fillRect(830, canvas.height - 45, 45, 45);
+        ctx.fillStyle = "#fff"; ctx.font = "10px sans-serif"; ctx.fillText("MOLO-T", 832, canvas.height - 50);
+    }
+    if (ownedTurrets.ak) {
+        ctx.fillStyle = "#1dd1a1"; ctx.fillRect(980, canvas.height - 35, 40, 35);
+        ctx.fillStyle = "#fff"; ctx.font = "10px sans-serif"; ctx.fillText("AK-T", 985, canvas.height - 40);
+    }
+
+    for (let i = turretEffects.length - 1; i >= 0; i--) {
+        let fx = turretEffects[i];
+        fx.alpha--;
+        ctx.save();
+        ctx.globalAlpha = fx.alpha / 10;
+        ctx.lineWidth = fx.type === 'shell' ? 5 : (fx.type === 'fire' ? 4 : 2);
+        ctx.strokeStyle = fx.type === 'shell' ? "#ff6b6b" : (fx.type === 'fire' ? "#ff9f43" : "#54a0ff");
+        ctx.beginPath();
+        ctx.moveTo(fx.sx, fx.sy);
+        ctx.lineTo(fx.tx, fx.ty);
+        ctx.stroke();
+        ctx.restore();
+        if (fx.alpha <= 0) turretEffects.splice(i, 1);
+    }
+}
+
+function gameLoop() {
+    ctx.save();
+    if (shakeIntensity > 0) {
+        let dx = (Math.random() - 0.5) * shakeIntensity;
+        let dy = (Math.random() - 0.5) * shakeIntensity;
+        ctx.translate(dx, dy);
+        shakeIntensity *= 0.88;
+        if(shakeIntensity < 0.2) shakeIntensity = 0;
+    }
+
+    const currentBgKey = `bg${currentWave}`;
+    if (images[currentBgKey] && loadedImages === totalImages) {
+        ctx.drawImage(images[currentBgKey], 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = "#1c1c1c";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (hp <= 0) {
+        shopOverlay.style.display = "none";
+        document.getElementById("bossHPContainer").style.display = "none";
+        ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ff3838"; ctx.font = "bold 45px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("방어선 무너짐 (GAME OVER)", canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+        return;
+    }
+    if (gameWon) {
+        shopOverlay.style.display = "none";
+        ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#2ecc71"; ctx.font = "bold 45px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("인류의 구원 (VICTORY)", canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+        return;
+    }
+
+    if (shootCooldown > 0) shootCooldown--;
+    if (isMouseDown && weapons[currentWeaponIndex].type === "auto") {
+        fireWeapon();
+    }
+
+    handleSpawning();
+    handleMolotovs(); 
+    handleTurrets(); 
+
+    if (waveState === "READY") {
+        updateShopUI();
+        shopOverlay.style.display = "flex"; 
+    }
+
+    fires.forEach(f => {
+        ctx.save();
+        let grad = ctx.createRadialGradient(f.x, f.y, 5, f.x, f.y, f.radius);
+        grad.addColorStop(0, "rgba(255, 107, 107, 0.4)");
+        grad.addColorStop(0.5, "rgba(255, 159, 67, 0.25)");
+        grad.addColorStop(1, "rgba(238, 82, 83, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+
+    renderTurretsOnField(); 
+    drawHUD();
+
+    if (activeBoss) {
+        const percentage = Math.max(0, (activeBoss.hp / activeBoss.maxHp) * 100);
+        document.getElementById("bossHPBar").style.width = percentage + "%";
+    }
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        
+        if (enemy.stunTimer > 0) {
+            enemy.stunTimer--;
+            ctx.save();
+            ctx.strokeStyle = "rgba(72, 219, 251, 0.6)";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.currentSize + 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            enemy.progress += enemy.speed;
+        }
+        
+        const horizonX = canvas.width * 0.48;
+        const horizonY = canvas.height * 0.42;
+        
+        let currentAngle = enemy.baseAngle + Math.sin(enemy.progress * enemy.waveFreq) * enemy.waveAmp;
+        
+        let targetX = horizonX + Math.cos(currentAngle) * (canvas.width * 0.55) * Math.pow(enemy.progress, 1.8);
+        let targetY = horizonY + Math.sin(currentAngle) * (canvas.height * 0.55) * Math.pow(enemy.progress, 1.8);
+        
+        if (enemy.isBossElement && enemy.stunTimer <= 0) {
+            enemy.animTimer += 0.04;
+            let bobbing = Math.sin(enemy.animTimer * 4.5) * (enemy.baseSize * 0.15) * enemy.progress;
+            targetY += bobbing;
+            
+            if (bobbing > (enemy.baseSize * 0.12) * enemy.progress) {
+                if (!enemy.shakeTriggered) {
+                    shakeIntensity = 7 * enemy.progress; 
+                    enemy.shakeTriggered = true;
+                }
+            } else {
+                enemy.shakeTriggered = false;
+            }
+        }
+
+        enemy.x = targetX;
+        enemy.y = targetY;
+        enemy.currentSize = enemy.baseSize * enemy.progress;
+
+        if (enemy.y + enemy.currentSize >= canvas.height - 4 || enemy.progress >= 0.99) {
+            if (enemy.isBossElement) {
+                // 수동 파괴 시와 마찬가지로, 바리케이드 돌파로 첫 보스 증발 시 두 번째 보스 스폰 트리거 예외 보강
+                if (!enemy.isSecondBoss && currentWave >= 5 && !secondBossSpawned) {
+                    triggerSecondBossSpawn();
+                }
+
+                if (barricade > 0) {
+                    barricade -= 150; 
+                    if (barricade < 0) {
+                        hp += Math.floor(barricade * 0.33); 
+                        barricade = 0;
+                    }
+                } else {
+                    hp -= 40; 
+                }
+                if (activeBoss === enemy) activeBoss = null;
+            } else {
+                if (barricade > 0) {
+                    barricade -= 15;
+                    if (barricade < 0) barricade = 0;
+                } else {
+                    hp -= 10;
+                }
+            }
+            
+            if (hp < 0) hp = 0;
+            enemies.splice(i, 1);
+            
+            const remainingBoss = enemies.find(e => e.isBossElement && e.hp > 0);
+            if (remainingBoss) activeBoss = remainingBoss;
+            else document.getElementById("bossHPContainer").style.display = "none";
+            
+            continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, enemy.progress * 3);
+        
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.currentSize, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.save();
+        ctx.clip();
+        
+        const enemyImg = images[enemy.imgKey];
+        if (enemyImg && enemyImg.complete) {
+            ctx.drawImage(enemyImg, enemy.x - enemy.currentSize, enemy.y - enemy.currentSize, enemy.currentSize * 2, enemy.currentSize * 2);
+        } else {
+            ctx.fillStyle = enemy.color || "#55efc4";
+            ctx.fill();
+        }
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.currentSize, 0, Math.PI * 2);
+        ctx.strokeStyle = enemy.isBossElement ? (enemy.isSecondBoss ? "rgba(235, 94, 85, 0.8)" : "rgba(255, 10, 10, 0.9)") : "#000";
+        ctx.lineWidth = enemy.isBossElement ? 4 : 2;
+        ctx.stroke();
+        ctx.closePath();
+        
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(enemy.x - enemy.currentSize, enemy.y - enemy.currentSize - 12, enemy.currentSize * 2, 4);
+        ctx.fillStyle = enemy.isBossElement ? "#ff3f34" : "#2ecc71";
+        ctx.fillRect(enemy.x - enemy.currentSize, enemy.y - enemy.currentSize - 12, (enemy.currentSize * 2) * (enemy.hp / enemy.maxHp), 4);
+        
+        ctx.restore();
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+        if (p.alpha <= 0) particles.splice(i, 1);
+        else {
+            ctx.save(); ctx.globalAlpha = p.alpha; ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    if (flashAlpha > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        flashAlpha -= 0.04;
+    }
+
+    if (waveState === "PLAYING") {
+        const currentWp = weapons[currentWeaponIndex];
+        ctx.strokeStyle = currentWp.name.includes("샷건") || currentWp.name.includes("소드오프") ? "rgba(234, 32, 39, 0.6)" : "rgba(0, 255, 66, 0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(mouseX, mouseY, currentWp.radius, 0, Math.PI * 2);
+        ctx.arc(mouseX, mouseY, 3, 0, Math.PI * 2);
+        ctx.moveTo(mouseX - (currentWp.radius + 8), mouseY); ctx.lineTo(mouseX + (currentWp.radius + 8), mouseY);
+        ctx.moveTo(mouseX, mouseY - (currentWp.radius + 8)); ctx.lineTo(mouseX, mouseY + (currentWp.radius + 8));
+        ctx.stroke();
+        ctx.closePath();
+    }
+
+    ctx.restore(); 
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
